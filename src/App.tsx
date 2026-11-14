@@ -6,9 +6,12 @@ import {
   FileCheck,
   MapPin,
   ChevronDown,
+  Mountain,
+  Gauge,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { CANDIDATE_LANDING_SITES } from './data/landingSites';
-import type { MissionWindowConfig } from './types/lunar';
+import type { LandingSite, MissionWindowConfig } from './types/lunar';
 import { computeMissionTimeline } from './services/ephemeris';
 import { assessMissionFeasibility } from './services/feasibilityEngine';
 import { SkyDomePlot } from './components/SkyDomePlot';
@@ -18,9 +21,14 @@ import { LaunchSlipSimulator } from './components/LaunchSlipSimulator';
 import { FeasibilityScorecard } from './components/FeasibilityScorecard';
 import { SiteComparisonModal } from './components/SiteComparisonModal';
 import { MissionReportModal } from './components/MissionReportModal';
+import { HorizonTerrainProfiler } from './components/HorizonTerrainProfiler';
+
+type WorkspaceMode = 'tactical' | 'terrain-profiler' | 'flight-readiness';
 
 export const App: React.FC = () => {
+  const [sitesList, setSitesList] = useState<LandingSite[]>(CANDIDATE_LANDING_SITES);
   const [selectedSiteId, setSelectedSiteId] = useState<string>(CANDIDATE_LANDING_SITES[0].id);
+  const [activeMode, setActiveMode] = useState<WorkspaceMode>('tactical');
 
   const [config, setConfig] = useState<MissionWindowConfig>({
     startDate: '2026-11-15T00:00',
@@ -46,10 +54,10 @@ export const App: React.FC = () => {
 
   const selectedSite = useMemo(() => {
     return (
-      CANDIDATE_LANDING_SITES.find((s) => s.id === selectedSiteId) ||
-      CANDIDATE_LANDING_SITES[0]
+      sitesList.find((s) => s.id === selectedSiteId) ||
+      sitesList[0]
     );
-  }, [selectedSiteId]);
+  }, [selectedSiteId, sitesList]);
 
   const samples = useMemo(() => {
     return computeMissionTimeline(selectedSite, config);
@@ -61,6 +69,12 @@ export const App: React.FC = () => {
   const assessment = useMemo(() => {
     return assessMissionFeasibility(selectedSite, samples);
   }, [selectedSite, samples]);
+
+  const handleCustomSiteCreated = (newSite: LandingSite) => {
+    setSitesList((prev) => [newSite, ...prev]);
+    setSelectedSiteId(newSite.id);
+    setCurrentIndex(0);
+  };
 
   return (
     <div className="min-h-screen bg-[#07090e] bg-grid-aerospace text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
@@ -91,7 +105,46 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Apple-grade Segmented Mode Switcher (Declutters the Dashboard) */}
+        <div className="segmented-control flex items-center p-1 text-xs font-mono">
+          <button
+            onClick={() => setActiveMode('tactical')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              activeMode === 'tactical'
+                ? 'bg-slate-800 text-cyan-300 font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Gauge size={13} />
+            <span>Tactical HUD</span>
+          </button>
+
+          <button
+            onClick={() => setActiveMode('terrain-profiler')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              activeMode === 'terrain-profiler'
+                ? 'bg-slate-800 text-cyan-300 font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Mountain size={13} className="text-amber-400" />
+            <span>Phase #2: Horizon Profiler</span>
+          </button>
+
+          <button
+            onClick={() => setActiveMode('flight-readiness')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              activeMode === 'flight-readiness'
+                ? 'bg-slate-800 text-cyan-300 font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <SlidersHorizontal size={13} />
+            <span>FRR Feasibility</span>
+          </button>
+        </div>
+
+        {/* Global Action Controls */}
         <div className="flex items-center gap-2.5 font-mono">
           <button
             onClick={() => setIsComparisonOpen(true)}
@@ -111,20 +164,14 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Mission Control Grid */}
-      <main className="flex-1 p-5 max-w-[1720px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Telemetry Column (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-4">
-          {/* Target Candidate Site Selector Card */}
-          <div className="telemetry-panel rounded-2xl p-4 shadow-xl flex flex-col gap-3 font-mono">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <MapPin size={13} className="text-cyan-400" />
-                Target Landing Corridor
-              </span>
-              <span className="text-[10px] text-slate-500">10 Artemis Candidate Sites</span>
-            </div>
-
+      {/* Main Workspace View */}
+      <main className="flex-1 p-5 max-w-[1720px] w-full mx-auto flex flex-col gap-5">
+        {/* Top Control Bar across all modes: Quick Site & Duration Summary */}
+        <div className="telemetry-panel rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-3">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              <MapPin size={13} className="text-cyan-400" /> Target:
+            </span>
             <div className="relative">
               <select
                 value={selectedSiteId}
@@ -132,151 +179,139 @@ export const App: React.FC = () => {
                   setSelectedSiteId(e.target.value);
                   setCurrentIndex(0);
                 }}
-                className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl p-2.5 appearance-none focus:outline-none focus:border-cyan-500 cursor-pointer"
+                className="bg-slate-950 border border-slate-800 text-slate-200 px-3 py-1 rounded-lg pr-7 appearance-none cursor-pointer text-xs focus:outline-none focus:border-cyan-500"
               >
-                {CANDIDATE_LANDING_SITES.map((site) => (
+                {sitesList.map((site) => (
                   <option key={site.id} value={site.id}>
-                    {site.name} ({site.code}) • Elev +{site.elevationKm}km
+                    {site.name} ({site.code}) • +{site.elevationKm}km
                   </option>
                 ))}
               </select>
-              <ChevronDown
-                size={15}
-                className="absolute right-3 top-3 text-slate-400 pointer-events-none"
+              <ChevronDown size={13} className="absolute right-2 top-2 text-slate-400 pointer-events-none" />
+            </div>
+            <span className="text-slate-500">|</span>
+            <span className="text-slate-300">
+              Coords: <span className="text-cyan-300 font-semibold">{selectedSite.latitude.toFixed(2)}° S, {selectedSite.longitude.toFixed(2)}° E</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              <Calendar size={13} className="text-cyan-400" /> Touchdown:
+            </span>
+            <input
+              type="datetime-local"
+              value={config.startDate}
+              onChange={(e) => {
+                setConfig({ ...config, startDate: e.target.value });
+                setCurrentIndex(0);
+              }}
+              className="bg-slate-950 border border-slate-800 text-slate-200 px-2 py-0.5 rounded-lg text-xs tabular-nums focus:outline-none"
+            />
+            <div className="segmented-control flex items-center text-[11px]">
+              {[3, 7, 14].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => {
+                    setConfig({ ...config, durationDays: d });
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    config.durationDays === d
+                      ? 'bg-slate-800 text-cyan-300 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* MODE 1: TACTICAL HUD (Clean, Declustered Orbit & Radar View) */}
+        {activeMode === 'tactical' && (
+          <div className="flex flex-col gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <SkyDomePlot
+                site={selectedSite}
+                currentSample={currentSample}
+                samples={samples}
+              />
+
+              <LunarGlobe3D
+                sites={sitesList}
+                selectedSite={selectedSite}
+                onSelectSite={(s) => {
+                  setSelectedSiteId(s.id);
+                  setCurrentIndex(0);
+                }}
+                currentSample={currentSample}
               />
             </div>
 
-            {/* Site Technical Telemetry */}
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 flex flex-col gap-1.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Coordinates:</span>
-                <span className="font-bold text-cyan-300 tabular-nums">
-                  {selectedSite.latitude.toFixed(2)}° S, {selectedSite.longitude.toFixed(2)}° E
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Datum Elevation:</span>
-                <span className="text-slate-200 tabular-nums">+{selectedSite.elevationKm} km</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Slope Profile:</span>
-                <span className="text-slate-200 tabular-nums">
-                  {selectedSite.meanSlopeDeg}° mean / {selectedSite.maxSlopeDeg}° max
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-sans leading-relaxed border-t border-slate-800/70 pt-2 mt-0.5">
-                {selectedSite.description}
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {selectedSite.tags.map((t, i) => (
-                  <span
-                    key={i}
-                    className="bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded text-[10px]"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <MissionTimeline
+              samples={samples}
+              currentIndex={safeIndex}
+              onSeek={(idx) => setCurrentIndex(idx)}
+            />
           </div>
+        )}
 
-          {/* Mission Window Configuration */}
-          <div className="telemetry-panel rounded-2xl p-4 shadow-xl flex flex-col gap-3 font-mono text-xs">
-            <span className="font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <Calendar size={13} className="text-cyan-400" />
-              Mission Window Parameters
-            </span>
+        {/* MODE 2: PHASE #2 TOPOGRAPHIC HORIZON PROFILER & RAY-TRACING */}
+        {activeMode === 'terrain-profiler' && (
+          <div className="flex flex-col gap-5">
+            <HorizonTerrainProfiler
+              site={selectedSite}
+              currentSample={currentSample}
+              onCustomSiteCreated={handleCustomSiteCreated}
+            />
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-slate-400 block mb-1 text-[11px]">Nominal Touchdown Date (UTC):</label>
-                <input
-                  type="datetime-local"
-                  value={config.startDate}
-                  onChange={(e) => {
-                    setConfig({ ...config, startDate: e.target.value });
+            <MissionTimeline
+              samples={samples}
+              currentIndex={safeIndex}
+              onSeek={(idx) => setCurrentIndex(idx)}
+            />
+          </div>
+        )}
+
+        {/* MODE 3: FLIGHT READINESS REVIEW & CONTINGENCY SIMULATOR */}
+        {activeMode === 'flight-readiness' && (
+          <div className="flex flex-col gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <div className="lg:col-span-4">
+                <LaunchSlipSimulator
+                  slipHours={config.launchSlipHours}
+                  onChangeSlip={(slip) => {
+                    setConfig({ ...config, launchSlipHours: slip });
                     setCurrentIndex(0);
                   }}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 p-2 rounded-xl focus:outline-none focus:border-cyan-500 tabular-nums"
+                  baseStartDate={config.startDate}
                 />
               </div>
 
-              <div>
-                <label className="text-slate-400 block mb-1 text-[11px]">Surface Stay Duration:</label>
-                <div className="segmented-control grid grid-cols-3 gap-1 p-1">
-                  {[3, 7, 14].map((days) => (
-                    <button
-                      key={days}
-                      onClick={() => {
-                        setConfig({ ...config, durationDays: days });
-                        setCurrentIndex(0);
-                      }}
-                      className={`py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                        config.durationDays === days
-                          ? 'bg-slate-800 text-cyan-300 shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {days} Days ({days * 24}h)
-                    </button>
-                  ))}
-                </div>
+              <div className="lg:col-span-8">
+                <FeasibilityScorecard
+                  site={selectedSite}
+                  assessment={assessment}
+                />
               </div>
             </div>
-          </div>
 
-          {/* Launch Slip / Contingency Simulator */}
-          <LaunchSlipSimulator
-            slipHours={config.launchSlipHours}
-            onChangeSlip={(slip) => {
-              setConfig({ ...config, launchSlipHours: slip });
-              setCurrentIndex(0);
-            }}
-            baseStartDate={config.startDate}
-          />
-        </div>
-
-        {/* Right Dashboard Column (8 cols) */}
-        <div className="lg:col-span-8 flex flex-col gap-5">
-          {/* Top Row: Dual Visualizations */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <SkyDomePlot
-              site={selectedSite}
-              currentSample={currentSample}
+            <MissionTimeline
               samples={samples}
-            />
-
-            <LunarGlobe3D
-              sites={CANDIDATE_LANDING_SITES}
-              selectedSite={selectedSite}
-              onSelectSite={(s) => {
-                setSelectedSiteId(s.id);
-                setCurrentIndex(0);
-              }}
-              currentSample={currentSample}
+              currentIndex={safeIndex}
+              onSeek={(idx) => setCurrentIndex(idx)}
             />
           </div>
-
-          {/* Middle Row: Mission Control Timeline & Scrubber */}
-          <MissionTimeline
-            samples={samples}
-            currentIndex={safeIndex}
-            onSeek={(idx) => setCurrentIndex(idx)}
-          />
-
-          {/* Bottom Row: Flight Readiness Review Scorecard */}
-          <FeasibilityScorecard
-            site={selectedSite}
-            assessment={assessment}
-          />
-        </div>
+        )}
       </main>
 
       {/* Modals */}
       <SiteComparisonModal
         isOpen={isComparisonOpen}
         onClose={() => setIsComparisonOpen(false)}
-        sites={CANDIDATE_LANDING_SITES}
+        sites={sitesList}
         config={config}
         onSelectSite={(s) => {
           setSelectedSiteId(s.id);
