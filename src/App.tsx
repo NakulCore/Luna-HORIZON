@@ -9,9 +9,11 @@ import {
   Mountain,
   Gauge,
   SlidersHorizontal,
+  Rocket,
+  BookOpen,
 } from 'lucide-react';
 import { CANDIDATE_LANDING_SITES } from './data/landingSites';
-import type { LandingSite, MissionWindowConfig } from './types/lunar';
+import type { LandingSite, MissionWindowConfig, MissionProgram } from './types/lunar';
 import { computeMissionTimeline } from './services/ephemeris';
 import { assessMissionFeasibility } from './services/feasibilityEngine';
 import { SkyDomePlot } from './components/SkyDomePlot';
@@ -22,6 +24,8 @@ import { FeasibilityScorecard } from './components/FeasibilityScorecard';
 import { SiteComparisonModal } from './components/SiteComparisonModal';
 import { MissionReportModal } from './components/MissionReportModal';
 import { HorizonTerrainProfiler } from './components/HorizonTerrainProfiler';
+import { MissionTutorialModal } from './components/MissionTutorialModal';
+import { CLPSDirectoryModal } from './components/CLPSDirectoryModal';
 
 type WorkspaceMode = 'tactical' | 'terrain-profiler' | 'flight-readiness';
 
@@ -29,6 +33,7 @@ export const App: React.FC = () => {
   const [sitesList, setSitesList] = useState<LandingSite[]>(CANDIDATE_LANDING_SITES);
   const [selectedSiteId, setSelectedSiteId] = useState<string>(CANDIDATE_LANDING_SITES[0].id);
   const [activeMode, setActiveMode] = useState<WorkspaceMode>('tactical');
+  const [programFilter, setProgramFilter] = useState<MissionProgram | 'ALL'>('ALL');
 
   const [config, setConfig] = useState<MissionWindowConfig>({
     startDate: '2026-11-15T00:00',
@@ -40,6 +45,8 @@ export const App: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isCLPSDirectoryOpen, setIsCLPSDirectoryOpen] = useState(false);
 
   // Live NASA UTC Clock
   const [liveUtcTime, setLiveUtcTime] = useState<string>('');
@@ -51,6 +58,11 @@ export const App: React.FC = () => {
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const visibleSites = useMemo(() => {
+    if (programFilter === 'ALL') return sitesList;
+    return sitesList.filter((s) => s.program === programFilter);
+  }, [sitesList, programFilter]);
 
   const selectedSite = useMemo(() => {
     return (
@@ -91,10 +103,10 @@ export const App: React.FC = () => {
               </h1>
               <span className="text-[10px] text-slate-400">/</span>
               <span className="text-xs font-semibold text-slate-300">
-                Artemis Lunar Landing Site Navigator
+                NASA Artemis & CLPS Mission Navigator
               </span>
               <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 text-[9px] px-1.5 py-0.2 rounded font-semibold">
-                SYSTEM NOMINAL
+                FLIGHT READY
               </span>
             </div>
             <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2">
@@ -145,30 +157,68 @@ export const App: React.FC = () => {
         </div>
 
         {/* Global Action Controls */}
-        <div className="flex items-center gap-2.5 font-mono">
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <button
+            onClick={() => setIsTutorialOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700/80 transition-colors shadow-sm"
+            title="Open Interactive Tutorial & Flight Manual"
+          >
+            <BookOpen size={13} />
+            <span>Tutorial</span>
+          </button>
+
+          <button
+            onClick={() => setIsCLPSDirectoryOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/80 transition-colors shadow-sm"
+            title="Browse NASA CLPS Manifest (IM-1, IM-2, Griffin, Blue Moon, Blue Ghost)"
+          >
+            <Rocket size={13} />
+            <span>CLPS Directory</span>
+          </button>
+
           <button
             onClick={() => setIsComparisonOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors shadow-sm"
           >
-            <Layers size={13} className="text-amber-400" />
-            <span>Multi-Site Matrix</span>
+            <Layers size={13} />
+            <span>Compare Sites</span>
           </button>
 
           <button
             onClick={() => setIsReportOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-colors shadow-sm"
           >
             <FileCheck size={13} />
-            <span>Export Mission Brief</span>
+            <span>Export Brief</span>
           </button>
         </div>
       </header>
 
       {/* Main Workspace View */}
       <main className="flex-1 p-5 max-w-[1720px] w-full mx-auto flex flex-col gap-5">
-        {/* Top Control Bar across all modes: Quick Site & Duration Summary */}
+        {/* Top Control Bar across all modes: Program Filter, Target Corridor & Duration */}
         <div className="telemetry-panel rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
           <div className="flex items-center gap-3">
+            {/* Program Filter: ALL / ARTEMIS / CLPS */}
+            <div className="segmented-control flex items-center text-[10px]">
+              {(['ALL', 'CLPS', 'ARTEMIS'] as const).map((prog) => (
+                <button
+                  key={prog}
+                  onClick={() => setProgramFilter(prog)}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    programFilter === prog
+                      ? 'bg-slate-800 text-cyan-300 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {prog === 'CLPS' ? 'NASA CLPS' : prog === 'ARTEMIS' ? 'Artemis HLS' : 'All Programs'}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-slate-500">|</span>
+
+            {/* Target Landing Corridor Selector */}
             <span className="text-slate-400 flex items-center gap-1.5">
               <MapPin size={13} className="text-cyan-400" /> Target:
             </span>
@@ -181,18 +231,20 @@ export const App: React.FC = () => {
                 }}
                 className="bg-slate-950 border border-slate-800 text-slate-200 px-3 py-1 rounded-lg pr-7 appearance-none cursor-pointer text-xs focus:outline-none focus:border-cyan-500"
               >
-                {sitesList.map((site) => (
+                {visibleSites.map((site) => (
                   <option key={site.id} value={site.id}>
-                    {site.name} ({site.code}) • +{site.elevationKm}km
+                    [{site.program}] {site.name} ({site.hemisphere}) • {site.latitude.toFixed(1)}°, {site.longitude.toFixed(1)}°
                   </option>
                 ))}
               </select>
               <ChevronDown size={13} className="absolute right-2 top-2 text-slate-400 pointer-events-none" />
             </div>
-            <span className="text-slate-500">|</span>
-            <span className="text-slate-300">
-              Coords: <span className="text-cyan-300 font-semibold">{selectedSite.latitude.toFixed(2)}° S, {selectedSite.longitude.toFixed(2)}° E</span>
-            </span>
+
+            {selectedSite.landerName && (
+              <span className="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-[10px] text-amber-300">
+                {selectedSite.landerName} ({selectedSite.clpsAward || 'NASA'})
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -326,6 +378,22 @@ export const App: React.FC = () => {
         assessment={assessment}
         config={config}
         samples={samples}
+      />
+
+      <MissionTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+        onNavigateToTab={(tab) => setActiveMode(tab)}
+      />
+
+      <CLPSDirectoryModal
+        isOpen={isCLPSDirectoryOpen}
+        onClose={() => setIsCLPSDirectoryOpen(false)}
+        sites={sitesList}
+        onSelectSite={(s) => {
+          setSelectedSiteId(s.id);
+          setCurrentIndex(0);
+        }}
       />
     </div>
   );

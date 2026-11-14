@@ -314,13 +314,31 @@ export const LunarGlobe3D: React.FC<LunarGlobe3DProps> = ({
     );
   }, [currentSample]);
 
-  // Preset Views
-  const setViewNadir = () => {
+  // Preset Views matching NASA CLPS / Artemis Hemispheres
+  const setViewSouthPole = () => {
     if (cameraRef.current && moonMeshRef.current && markersGroupRef.current) {
       moonMeshRef.current.rotation.set(0, 0, 0);
       markersGroupRef.current.rotation.set(0, 0, 0);
       cameraRef.current.position.set(0, -3.8, 2.3);
       cameraRef.current.lookAt(0, -1.8, 0);
+    }
+  };
+
+  const setViewNearSide = () => {
+    if (cameraRef.current && moonMeshRef.current && markersGroupRef.current) {
+      moonMeshRef.current.rotation.set(0, -Math.PI / 2, 0);
+      markersGroupRef.current.rotation.set(0, -Math.PI / 2, 0);
+      cameraRef.current.position.set(0, 0, 4.5);
+      cameraRef.current.lookAt(0, 0, 0);
+    }
+  };
+
+  const setViewFarSide = () => {
+    if (cameraRef.current && moonMeshRef.current && markersGroupRef.current) {
+      moonMeshRef.current.rotation.set(0, Math.PI / 2, 0);
+      markersGroupRef.current.rotation.set(0, Math.PI / 2, 0);
+      cameraRef.current.position.set(0, 0, 4.5);
+      cameraRef.current.lookAt(0, 0, 0);
     }
   };
 
@@ -345,11 +363,11 @@ export const LunarGlobe3D: React.FC<LunarGlobe3DProps> = ({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-200">
-              Orbital Cartography
+              NASA Planetary Cartography
             </span>
           </div>
           <span className="text-[10px] text-slate-400">
-            LRO LOLA Selenocentric Model (South Pole Graticule)
+            {selectedSite.hemisphere.toUpperCase()} • {selectedSite.program} MISSION
           </span>
         </div>
 
@@ -371,25 +389,42 @@ export const LunarGlobe3D: React.FC<LunarGlobe3DProps> = ({
         )}
       </div>
 
-      {/* Bottom Aerospace Bar & View Presets */}
+      {/* Bottom Aerospace Bar & NASA Hemispheric View Presets */}
       <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center text-xs font-mono pointer-events-auto">
         <div className="bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300">
           Target: <span className="font-semibold text-cyan-300">{selectedSite.name}</span> (
           {selectedSite.latitude.toFixed(2)}°, {selectedSite.longitude.toFixed(2)}°)
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* 3 NASA Infographic Hemispheres */}
+        <div className="segmented-control flex items-center text-[10px]">
           <button
-            onClick={setViewNadir}
-            className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors font-medium text-[11px]"
+            onClick={setViewNearSide}
+            className="px-2 py-1 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+            title="Near Side view (e.g. Mare Crisium, Reiner Gamma)"
           >
-            Polar Nadir
+            Near Side
+          </button>
+          <button
+            onClick={setViewFarSide}
+            className="px-2 py-1 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+            title="Far Side view (e.g. Schrödinger Basin)"
+          >
+            Far Side
+          </button>
+          <button
+            onClick={setViewSouthPole}
+            className="px-2 py-1 rounded hover:bg-slate-800 text-cyan-300 hover:text-white transition-colors font-semibold"
+            title="South Pole view (e.g. Shackleton, Mons Mouton, Malapert)"
+          >
+            South Pole
           </button>
           <button
             onClick={setViewSolar}
-            className="bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors font-medium text-[11px]"
+            className="px-2 py-1 rounded hover:bg-slate-800 text-amber-300 hover:text-white transition-colors"
+            title="View along Solar Vector"
           >
-            Sun Vector Aspect
+            Solar Aspect
           </button>
         </div>
       </div>

@@ -3,18 +3,25 @@ export interface HorizonPoint {
   elevationMask: number; // degrees above horizontal tangent plane (can be negative if downhill)
 }
 
+export type MissionProgram = 'ARTEMIS' | 'CLPS' | 'CUSTOM';
+export type LunarHemisphere = 'Near Side' | 'Far Side' | 'South Pole';
+
 export interface LandingSite {
   id: string;
   name: string;
   code: string;
-  latitude: number; // Selenographic latitude (degrees, e.g. -89.44)
-  longitude: number; // Selenographic longitude (degrees, e.g. 124.5)
+  program: MissionProgram;
+  hemisphere: LunarHemisphere;
+  landerName?: string;
+  clpsAward?: string; // e.g. "TO PRIME-1", "TO 2-IM", "CP-22"
+  latitude: number; // Selenographic latitude (degrees)
+  longitude: number; // Selenographic longitude (degrees)
   elevationKm: number; // Elevation relative to lunar datum
   meanSlopeDeg: number; // Average slope hazard at landing zone
   maxSlopeDeg: number;
-  scientificTarget: string; // e.g. "Volatile traps & ancient mantle samples"
+  scientificTarget: string;
   description: string;
-  horizonProfile: HorizonPoint[]; // 360 points or interpolated points
+  horizonProfile: HorizonPoint[];
   tags: string[];
 }
 

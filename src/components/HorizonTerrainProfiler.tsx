@@ -113,6 +113,8 @@ export const HorizonTerrainProfiler: React.FC<HorizonTerrainProfilerProps> = ({
       id: `custom-site-${Date.now()}`,
       name: `Custom Polar Site (${customLat.toFixed(2)}°S, ${customLon.toFixed(1)}°E)`,
       code: `EXP-USER-${Math.floor(Math.random() * 900 + 100)}`,
+      program: 'CUSTOM',
+      hemisphere: 'South Pole',
       latitude: customLat,
       longitude: customLon,
       elevationKm: customElev,
